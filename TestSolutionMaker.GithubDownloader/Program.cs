@@ -5,9 +5,9 @@ using Microsoft.Extensions.Configuration;
 class Program
 {
     private static string RepoUrl;
-    private static string SearchFile;
+    private static string ProjectFile;
     private static string TempDir;
-    private static string OutputDir;
+    private static string ProjectDirectory;
     private static string SolutionName;
     private static string SolutionDirectory;
 
@@ -33,8 +33,8 @@ class Program
             RunCommand("dotnet", $"new sln -n {SolutionName}  --force", SolutionDirectory);
 
             // Добавление проекта в решение
-            string projectPath = Path.Combine(OutputDir, SearchFile);
-            RunCommand("dotnet", $"sln {SolutionName} add \"{projectPath}\"  --force", SolutionDirectory);
+            string projectPath = Path.Combine(ProjectDirectory, ProjectFile);
+            RunCommand("dotnet", $"sln {SolutionName}.sln add \"{projectPath}\" ", Path.GetFullPath(SolutionDirectory));
 
             Console.WriteLine($"Файл решения создан: {solutionPath}");
         }
@@ -86,24 +86,25 @@ class Program
             RunCommand("git", $"clone {RepoUrl} {TempDir}");
 
             Console.WriteLine("Ищем нужный файл...");
-            string foundFolder = FindFolderContainingFile(TempDir, SearchFile);
+            string foundFolder = FindFolderContainingFile(TempDir, ProjectFile);
             if (foundFolder == null)
             {
-                Console.WriteLine($"Файл '{SearchFile}' не найден.");
+                Console.WriteLine($"Файл '{ProjectFile}' не найден.");
                 return;
             }
 
             Console.WriteLine($"Файл найден в папке: {foundFolder}");
 
             Console.WriteLine("Перемещаем найденную папку...");
-            if (Directory.Exists(OutputDir))
+            string projectDir = Path.Combine(SolutionDirectory, ProjectDirectory);
+            if (Directory.Exists(projectDir))
             {
                 Console.WriteLine("Выходная папка уже существует, удаляем...");
-                Directory.Delete(OutputDir, true);
+                Directory.Delete(projectDir, true);
             }
-            Directory.Move(foundFolder, OutputDir);
+            Directory.Move(foundFolder, projectDir);
 
-            Console.WriteLine($"Готово! Папка сохранена в {OutputDir}");
+            Console.WriteLine($"Готово! Папка сохранена в {projectDir}");
         }
         catch (Exception ex)
         {
@@ -125,9 +126,9 @@ class Program
             .Build();
 
         RepoUrl = config["GitHub:RepoUrl"];
-        SearchFile = config["GitHub:SearchFile"];
+        ProjectFile = config["GitHub:ProjectFile"];
         TempDir = config["GitHub:TempDir"];
-        OutputDir = config["GitHub:OutputDir"];
+        ProjectDirectory = config["GitHub:ProjectDirectory"];
         SolutionName = config["GitHub:SolutionName"];
         SolutionDirectory = config["GitHub:SolutionDirectory"];
     }
