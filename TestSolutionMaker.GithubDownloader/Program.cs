@@ -2,16 +2,16 @@
 using System.Text;
 using Microsoft.Extensions.Configuration;
 
-class Program
+internal class Program
 {
-    private static string RepoUrl;
-    private static string ProjectFile;
-    private static string TempDir;
-    private static string ProjectDirectory;
-    private static string SolutionName;
-    private static string SolutionDirectory;
+    private static string _repoUrl;
+    private static string _projectFile;
+    private static string _tempDir;
+    private static string _projectDirectory;
+    private static string _solutionName;
+    private static string _solutionDirectory;
 
-    static void Main()
+    private static void Main()
     {
         LoadConfiguration();
 
@@ -22,19 +22,19 @@ class Program
 
     private static void CreateSolution()
     {
-        string solutionPath = Path.Combine(SolutionDirectory, SolutionName);
+        var solutionPath = Path.Combine(_solutionDirectory, _solutionName);
 
         try
         {
             // Создание папки, если её нет
-            Directory.CreateDirectory(SolutionDirectory);
+            Directory.CreateDirectory(_solutionDirectory);
 
             // Создание решения
-            RunCommand("dotnet", $"new sln -n {SolutionName}  --force", SolutionDirectory);
+            RunCommand("dotnet", $"new sln -n {_solutionName}  --force", _solutionDirectory);
 
             // Добавление проекта в решение
-            string projectPath = Path.Combine(ProjectDirectory, ProjectFile);
-            RunCommand("dotnet", $"sln {SolutionName}.sln add \"{projectPath}\" ", Path.GetFullPath(SolutionDirectory));
+            var projectPath = Path.Combine(_projectDirectory, _projectFile);
+            RunCommand("dotnet", $"sln {_solutionName}.sln add \"{projectPath}\" ", Path.GetFullPath(_solutionDirectory));
 
             Console.WriteLine($"Файл решения создан: {solutionPath}");
         }
@@ -44,9 +44,9 @@ class Program
         }
     }
 
-    static void RunCommand(string command, string arguments, string workingDirectory)
+    private static void RunCommand(string command, string arguments, string workingDirectory)
     {
-        ProcessStartInfo psi = new ProcessStartInfo
+        var psi = new ProcessStartInfo
         {
             FileName = command,
             Arguments = arguments,
@@ -59,11 +59,11 @@ class Program
             StandardErrorEncoding = Encoding.UTF8
         };
 
-        using Process process = Process.Start(psi);
+        using var process = Process.Start(psi);
         process.WaitForExit();
         
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
 
         if (!string.IsNullOrWhiteSpace(output))
             Console.WriteLine(output);
@@ -76,32 +76,38 @@ class Program
     {
         try
         {
-            if (Directory.Exists(TempDir))
+            if (Directory.Exists(_tempDir))
             {
                 Console.WriteLine("Временная папка уже существует, удаляем...");
-                RunCommand("cmd.exe", $"/c rmdir /s /q \"{TempDir}\"");
+                RunCommand("cmd.exe", $"/c rmdir /s /q \"{_tempDir}\"");
             }
             
             Console.WriteLine("Клонируем репозиторий (без файлов)...");
-            RunCommand("git", $"clone {RepoUrl} {TempDir}");
+            RunCommand("git", $"clone {_repoUrl} {_tempDir}");
 
             Console.WriteLine("Ищем нужный файл...");
-            string foundFolder = FindFolderContainingFile(TempDir, ProjectFile);
+            var foundFolder = FindFolderContainingFile(_tempDir, _projectFile);
             if (foundFolder == null)
             {
-                Console.WriteLine($"Файл '{ProjectFile}' не найден.");
+                Console.WriteLine($"Файл '{_projectFile}' не найден.");
                 return;
             }
 
             Console.WriteLine($"Файл найден в папке: {foundFolder}");
 
             Console.WriteLine("Перемещаем найденную папку...");
-            string projectDir = Path.Combine(SolutionDirectory, ProjectDirectory);
+            var projectDir = Path.Combine(_solutionDirectory, _projectDirectory);
             if (Directory.Exists(projectDir))
             {
                 Console.WriteLine("Выходная папка уже существует, удаляем...");
                 Directory.Delete(projectDir, true);
             }
+
+            if (!Directory.Exists(_solutionDirectory))
+            {
+                Directory.CreateDirectory(_solutionDirectory);
+            }
+            
             Directory.Move(foundFolder, projectDir);
 
             Console.WriteLine($"Готово! Папка сохранена в {projectDir}");
@@ -112,28 +118,28 @@ class Program
         }
         finally
         {
-            if (Directory.Exists(TempDir))
-                RunCommand("cmd.exe", $"/c rmdir /s /q \"{TempDir}\"");
+            if (Directory.Exists(_tempDir))
+                RunCommand("cmd.exe", $"/c rmdir /s /q \"{_tempDir}\"");
         }
     }
 
 
-    static void LoadConfiguration()
+    private static void LoadConfiguration()
     {
         var config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .Build();
 
-        RepoUrl = config["GitHub:RepoUrl"];
-        ProjectFile = config["GitHub:ProjectFile"];
-        TempDir = config["GitHub:TempDir"];
-        ProjectDirectory = config["GitHub:ProjectDirectory"];
-        SolutionName = config["GitHub:SolutionName"];
-        SolutionDirectory = config["GitHub:SolutionDirectory"];
+        _repoUrl = config["GitHub:RepoUrl"];
+        _projectFile = config["GitHub:ProjectFile"];
+        _tempDir = config["GitHub:TempDir"];
+        _projectDirectory = config["GitHub:ProjectDirectory"];
+        _solutionName = config["GitHub:SolutionName"];
+        _solutionDirectory = config["GitHub:SolutionDirectory"];
     }
 
-    static string FindFolderContainingFile(string rootDir, string searchFile)
+    private static string FindFolderContainingFile(string rootDir, string searchFile)
     {
         foreach (var file in Directory.GetFiles(rootDir, searchFile, SearchOption.AllDirectories))
         {
@@ -144,7 +150,7 @@ class Program
         return null;
     }
 
-    static void RunCommand(string command, string arguments)
+    private static void RunCommand(string command, string arguments)
     {
         var process = new Process
         {
