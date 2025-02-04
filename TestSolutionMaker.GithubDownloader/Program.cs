@@ -1,7 +1,5 @@
-﻿using System;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
+﻿using System.Diagnostics;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 
 class Program
@@ -10,11 +8,72 @@ class Program
     private static string SearchFile;
     private static string TempDir;
     private static string OutputDir;
+    private static string SolutionName;
+    private static string SolutionDirectory;
 
     static void Main()
     {
         LoadConfiguration();
 
+        DownloadTestsFromGithub();
+
+        CreateSolution();
+    }
+
+    private static void CreateSolution()
+    {
+        string solutionPath = Path.Combine(SolutionDirectory, SolutionName);
+
+        try
+        {
+            // Создание папки, если её нет
+            Directory.CreateDirectory(SolutionDirectory);
+
+            // Создание решения
+            RunCommand("dotnet", $"new sln -n {SolutionName}  --force", SolutionDirectory);
+
+            // Добавление проекта в решение
+            string projectPath = Path.Combine(OutputDir, SearchFile);
+            RunCommand("dotnet", $"sln {SolutionName} add \"{projectPath}\"  --force", SolutionDirectory);
+
+            Console.WriteLine($"Файл решения создан: {solutionPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ошибка: {ex.Message}");
+        }
+    }
+
+    static void RunCommand(string command, string arguments, string workingDirectory)
+    {
+        ProcessStartInfo psi = new ProcessStartInfo
+        {
+            FileName = command,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = workingDirectory,
+            StandardOutputEncoding = Encoding.UTF8, // Явная установка кодировки
+            StandardErrorEncoding = Encoding.UTF8
+        };
+
+        using Process process = Process.Start(psi);
+        process.WaitForExit();
+        
+        string output = process.StandardOutput.ReadToEnd();
+        string error = process.StandardError.ReadToEnd();
+
+        if (!string.IsNullOrWhiteSpace(output))
+            Console.WriteLine(output);
+
+        if (!string.IsNullOrWhiteSpace(error))
+            throw new Exception($"Ошибка: {error}");
+    }
+    
+    private static void DownloadTestsFromGithub()
+    {
         try
         {
             if (Directory.Exists(TempDir))
@@ -56,9 +115,8 @@ class Program
                 RunCommand("cmd.exe", $"/c rmdir /s /q \"{TempDir}\"");
         }
     }
-    
 
-    
+
     static void LoadConfiguration()
     {
         var config = new ConfigurationBuilder()
@@ -70,6 +128,8 @@ class Program
         SearchFile = config["GitHub:SearchFile"];
         TempDir = config["GitHub:TempDir"];
         OutputDir = config["GitHub:OutputDir"];
+        SolutionName = config["GitHub:SolutionName"];
+        SolutionDirectory = config["GitHub:SolutionDirectory"];
     }
 
     static string FindFolderContainingFile(string rootDir, string searchFile)
